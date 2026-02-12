@@ -16,8 +16,9 @@ concurrencies=("1" "2" "4" "8" "16" "32" "64")
 # Maximum number of requests per concurrency level
 MAX_REQUESTS=32
 
-# Ollama API base (default local installation)
-export OLLAMA_API_BASE="http://localhost:11434"
+# Ollama OpenAI-compatible API endpoint
+export OPENAI_API_BASE="http://localhost:11434/v1"
+export OPENAI_API_KEY="ollama"  # Dummy key - Ollama doesn't require authentication
 
 # Create main results directory
 MAIN_RESULTS_DIR="results_ollama"
@@ -32,6 +33,7 @@ echo "Model,Concurrency,NumCompletedRequests,TTFT_Mean(s),TTFT_P50(s),TTFT_P99(s
 echo "========================================="
 echo "Starting Ollama Benchmark"
 echo "Testing ${#models[@]} models with ${#concurrencies[@]} concurrency levels"
+echo "Using OpenAI-compatible API: ${OPENAI_API_BASE}"
 echo "Results will be saved to: ${CSV_FILE}"
 echo "========================================="
 
@@ -57,10 +59,10 @@ for model in "${models[@]}"; do
     OUT_DIR="${MAIN_RESULTS_DIR}/${model_safe}/concurrency_${c}"
     mkdir -p "${OUT_DIR}"
     
-    # Run the benchmark
+    # Run the benchmark using OpenAI API (Ollama is OpenAI-compatible)
     python token_benchmark_ray.py \
-      --model "ollama/${model}" \
-      --llm-api litellm \
+      --model "${model}" \
+      --llm-api openai \
       --mean-input-tokens 100 \
       --stddev-input-tokens 0 \
       --mean-output-tokens 1024 \
@@ -70,7 +72,11 @@ for model in "${models[@]}"; do
       --num-concurrent-requests "${c}" \
       --results-dir "${OUT_DIR}" \
       --metadata "backend=ollama,model=${model},concurrency=${c}" \
-      --additional-sampling-params '{}'
+      --additional-sampling-params '{}' || {
+        echo "  ✗ Error running benchmark for ${model} at concurrency ${c}"
+        echo "${model},${c},0,0,0,0,0,0,0,0,0,0,0,1.0" >> "${CSV_FILE}"
+        continue
+      }
     
     # Extract metrics from JSON and append to CSV
     # Find the summary JSON file
@@ -127,10 +133,14 @@ try:
     
 except Exception as e:
     print(f"  ✗ Error extracting metrics: {e}", file=sys.stderr)
+    # Write error row to CSV
+    with open("${CSV_FILE}", "a") as csv_file:
+        csv_file.write(f"${model},${c},0,0,0,0,0,0,0,0,0,0,0,1.0\n")
     sys.exit(1)
 EOF
     else
       echo "  ✗ Warning: Summary JSON not found in ${OUT_DIR}"
+      echo "${model},${c},0,0,0,0,0,0,0,0,0,0,0,1.0" >> "${CSV_FILE}"
     fi
     
     echo "  ✓ Completed concurrency ${c} for ${model}"
