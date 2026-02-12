@@ -89,7 +89,11 @@ class OpenAIChatCompletionsClient(LLMClient):
                         raise RuntimeError(data["error"]["message"])
                         
                     delta = data["choices"][0]["delta"]
-                    if delta.get("content", None):
+                    # Reasoning models (e.g. Qwen3, DeepSeek-R1) output tokens
+                    # to "reasoning" field instead of "content" during thinking.
+                    # Both count as generated tokens for benchmarking purposes.
+                    token_text = delta.get("content") or delta.get("reasoning") or ""
+                    if token_text:
                         if not ttft:
                             ttft = time.monotonic() - start_time
                             time_to_next_token.append(ttft)
@@ -98,7 +102,7 @@ class OpenAIChatCompletionsClient(LLMClient):
                                 time.monotonic() - most_recent_received_token_time
                             )
                         most_recent_received_token_time = time.monotonic()
-                        generated_text += delta["content"]
+                        generated_text += token_text
 
             total_request_time = time.monotonic() - start_time
             output_throughput = tokens_received / total_request_time
