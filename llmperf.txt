@@ -1,0 +1,4 @@
+python collect_llmperf_table.py --base-dir results_vllm_Qwen3_32B_FULL --out llmperf_table_32B_FULL.csv
+
+export OPENAI_API_BASE="http://localhost:8005/v1" 
+export OPENAI_API_KEY="Dummy"

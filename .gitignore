@@ -105,6 +105,7 @@ scripts/nodes.txt
 # Debug files
 *.dSYM/
 *.su
+.venv/
 
 # Python setup files
 *.egg-info
